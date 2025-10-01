@@ -9,19 +9,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Eye, EyeOff, ArrowLeft, Mail, Lock } from "lucide-react";
+import { Eye, EyeOff, ArrowLeft, Mail, Lock, User } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "@/hooks/use-toast";
 
-const Login = () => {
+const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
+    name: "",
     email: "",
     password: "",
+    confirmPassword: "",
   });
   const [isLoading, setIsLoading] = useState(false);
-  const { login, isAuthenticated } = useAuth();
+  const { register, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   // Redirecionar se já estiver autenticado
@@ -39,46 +42,92 @@ const Login = () => {
     }));
   };
 
+  const validateForm = (): boolean => {
+    if (!formData.name.trim()) {
+      toast({
+        title: "Nome obrigatório",
+        description: "Por favor, insira seu nome completo.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    if (!formData.email.trim()) {
+      toast({
+        title: "Email obrigatório",
+        description: "Por favor, insira seu email.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    if (formData.password.length < 6) {
+      toast({
+        title: "Senha muito curta",
+        description: "A senha deve ter pelo menos 6 caracteres.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      toast({
+        title: "Senhas não coincidem",
+        description: "As senhas digitadas não são iguais.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!validateForm()) {
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const success = await login(formData.email, formData.password);
+      if (register) {
+        const success = await register(
+          formData.email,
+          formData.password,
+          formData.name
+        );
 
-      if (success) {
-        toast({
-          title: "Login realizado com sucesso!",
-          description: "Bem-vindo de volta!",
-        });
-        navigate("/");
-      } else {
-        toast({
-          title: "Credenciais inválidas",
-          description:
-            "Email ou senha incorretos. Verifique seus dados e tente novamente.",
-          variant: "destructive",
-        });
+        if (success) {
+          toast({
+            title: "Conta criada com sucesso!",
+            description: "Verifique seu email para confirmar sua conta.",
+          });
+
+          setTimeout(() => {
+            navigate("/login");
+          }, 2000);
+        }
       }
     } catch (error) {
-      console.error("Erro no login:", error);
+      console.error("Erro no registro:", error);
 
-      let errorMessage = "Ocorreu um erro inesperado. Tente novamente.";
+      let errorMessage = "Ocorreu um erro ao criar sua conta. Tente novamente.";
 
       if (error instanceof Error) {
-        if (
-          error.message.includes("Failed to fetch") ||
-          error.message.includes("NetworkError")
-        ) {
+        if (error.message.includes("already registered")) {
           errorMessage =
-            "Erro de conexão. Verifique sua internet e tente novamente.";
-        } else if (error.message.includes("Invalid")) {
-          errorMessage = "Email ou senha inválidos.";
+            "Este email já está cadastrado. Faça login ou use outro email.";
+        } else if (error.message.includes("Invalid email")) {
+          errorMessage = "Email inválido. Verifique e tente novamente.";
+        } else if (error.message.includes("Password")) {
+          errorMessage = "A senha não atende aos requisitos mínimos.";
         }
       }
 
       toast({
-        title: "Erro no login",
+        title: "Erro ao criar conta",
         description: errorMessage,
         variant: "destructive",
       });
@@ -114,16 +163,32 @@ const Login = () => {
                 AI Studios
               </span>
             </div>
-            <CardTitle className="text-2xl font-bold">
-              Bem-vindo de volta
-            </CardTitle>
+            <CardTitle className="text-2xl font-bold">Crie sua conta</CardTitle>
             <CardDescription className="text-muted-foreground">
-              Entre com sua conta para acessar nossa plataforma de IA
+              Comece sua jornada com nossa plataforma de IA
             </CardDescription>
           </CardHeader>
 
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Nome */}
+              <div className="space-y-2">
+                <Label htmlFor="name">Nome completo</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="name"
+                    name="name"
+                    type="text"
+                    placeholder="Seu nome completo"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    className="pl-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                    required
+                  />
+                </div>
+              </div>
+
               {/* Email */}
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
@@ -151,7 +216,7 @@ const Login = () => {
                     id="password"
                     name="password"
                     type={showPassword ? "text" : "password"}
-                    placeholder="Digite sua senha"
+                    placeholder="Mínimo 6 caracteres"
                     value={formData.password}
                     onChange={handleInputChange}
                     className="pl-10 pr-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
@@ -171,24 +236,65 @@ const Login = () => {
                 </div>
               </div>
 
-              {/* Lembrar e Esqueci a senha */}
-              <div className="flex items-center justify-between text-sm">
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4 text-primary focus:ring-primary border-border rounded"
+              {/* Confirmar Senha */}
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirmar senha</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Digite a senha novamente"
+                    value={formData.confirmPassword}
+                    onChange={handleInputChange}
+                    className="pl-10 pr-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                    required
                   />
-                  <span className="text-muted-foreground">Lembrar de mim</span>
-                </label>
-                <a
-                  href="#"
-                  className="text-primary hover:text-primary/80 transition-colors duration-200"
-                >
-                  Esqueci a senha
-                </a>
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors duration-200"
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
 
-              {/* Botão de Login */}
+              {/* Termos e condições */}
+              <div className="flex items-start space-x-2 text-sm">
+                <input
+                  type="checkbox"
+                  id="terms"
+                  required
+                  className="w-4 h-4 mt-0.5 text-primary focus:ring-primary border-border rounded"
+                />
+                <label
+                  htmlFor="terms"
+                  className="text-muted-foreground cursor-pointer"
+                >
+                  Eu aceito os{" "}
+                  <a
+                    href="#"
+                    className="text-primary hover:text-primary/80 transition-colors duration-200"
+                  >
+                    Termos de Uso
+                  </a>{" "}
+                  e a{" "}
+                  <a
+                    href="#"
+                    className="text-primary hover:text-primary/80 transition-colors duration-200"
+                  >
+                    Política de Privacidade
+                  </a>
+                </label>
+              </div>
+
+              {/* Botão de Registro */}
               <Button
                 type="submit"
                 disabled={isLoading}
@@ -197,23 +303,23 @@ const Login = () => {
                 {isLoading ? (
                   <div className="flex items-center space-x-2">
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Entrando...</span>
+                    <span>Criando conta...</span>
                   </div>
                 ) : (
-                  "Entrar"
+                  "Criar conta"
                 )}
               </Button>
             </form>
 
             {/* Rodapé */}
             <div className="mt-6 text-center text-sm text-muted-foreground">
-              Não tem uma conta?{" "}
-              <a
-                href="/register"
+              Já tem uma conta?{" "}
+              <Link
+                to="/login"
                 className="text-primary hover:text-primary/80 transition-colors duration-200 font-medium"
               >
-                Cadastre-se gratuitamente
-              </a>
+                Faça login
+              </Link>
             </div>
           </CardContent>
         </Card>
@@ -221,7 +327,7 @@ const Login = () => {
         {/* Informações adicionais */}
         <div className="mt-8 text-center text-xs text-muted-foreground">
           <p>
-            Ao entrar, você concorda com nossos{" "}
+            Ao criar uma conta, você concorda com nossos{" "}
             <a
               href="#"
               className="text-primary hover:text-primary/80 transition-colors duration-200"
@@ -242,4 +348,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default Register;

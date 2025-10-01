@@ -23,9 +23,16 @@ export interface AuthResponse {
 export interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
+  isLoading?: boolean;
   login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
-  updateProfile: (userData: Partial<User>) => void;
+  register?: (
+    email: string,
+    password: string,
+    name?: string
+  ) => Promise<boolean>;
+  loginWithProvider?: (provider: "google" | "github") => Promise<void>;
+  logout: () => void | Promise<void>;
+  updateProfile: (userData: Partial<User>) => void | Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(
